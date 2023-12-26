@@ -2,6 +2,7 @@ import argparse
 import os
 import re
 import shlex
+from timeit import default_timer as timer
 from dataclasses import dataclass
 import subprocess
 import sys
@@ -12,6 +13,7 @@ _PATTERNS = {
     'sample.in': 'sample.out', 'in.txt': 'out.txt', '^in': 'out',
     '\\.in$': '.out'
 }
+_MS_COEF = 1000
 
 
 def visit_files(visitor, config):
@@ -57,12 +59,14 @@ class TestRunner:
                 inp = error_file.read()
             with open(outf, 'rb') as error_file:
                 expect = error_file.read()
+            start_time = timer()
             with subprocess.Popen(
                 shlex.split(self._cmd), cwd=self._cwd,
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE) as proc:
                 try:
                     actual, errs = proc.communicate(input=inp, timeout=_TIMEOUT)
+                    end_time = timer()
                     if errs:
                         print("stderr:")
                         print(errs.decode('utf-8'), end="")
@@ -76,6 +80,8 @@ class TestRunner:
                         with open(error_filename, 'wb') as error_file:
                             error_file.write(actual)
                         return False
+                    time_ms = (end_time-start_time)*_MS_COEF
+                    print(f'SUCCESS: time={time_ms:.2f}ms')
                     try:
                         os.remove(error_filename)
                     except FileNotFoundError:
